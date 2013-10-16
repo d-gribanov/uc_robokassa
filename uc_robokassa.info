@@ -1,0 +1,6 @@
+name = Robokassa
+description = Processes payments using Robokassa Website.
+dependencies[] = uc_payment
+package = Ubercart - payment
+core = 7.x
+

@@ -1,0 +1,129 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function uc_robokassa_menu() {
+  $items['uc_robokassa/ipn'] = array(
+    'title' => 'Robokassa IPN',
+    'page callback' => 'uc_robokassa_ipn',
+    'access callback' => TRUE,
+    'type' => MENU_CALLBACK,
+    'file' => 'uc_robokassa.pages.inc',
+  );
+  $items['uc_robokassa/complete'] = array(
+    'title' => 'Robokassa payment complete',
+    'page callback' => 'uc_robokassa_complete',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'uc_robokassa.pages.inc',
+  );
+  $items['uc_robokassa/cancel'] = array(
+    'title' => 'Robokassa payment canceled',
+    'page callback' => 'uc_robokassa_cancel',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+    'file' => 'uc_robokassa.pages.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_uc_payment_method().
+ */
+function uc_robokassa_uc_payment_method() {
+  $methods[] = array(
+    'id' => 'robokassa',
+    'name' => t('Robokassa Website Payments'),
+    'title' => t('Robokassa'),
+    'review' => t('Robokassa'),
+    'desc' => t('Redirect users to submit payments through Robokassa.'),
+    'callback' => 'uc_payment_method_robokassa',
+    'redirect' => 'uc_robokassa_form',
+    'weight' => 1,
+    'checkout' => FALSE,
+    'no_gateway' => TRUE,
+  );
+  return $methods;
+}
+
+/**
+ * Handles the Website Payments Standard payment method.
+ */
+function uc_payment_method_robokassa($op, &$order) {
+  switch ($op) {
+    case 'order-view':
+      $build['#markup'] = t('Transaction ID:<br />@txn_id', array('@txn_id' => $order->order_id));
+      return $build;
+
+    case 'settings':
+      $form['uc_robokassa_MerchantLogin'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Merchant login'),
+        '#description' => t('The Merchant login you use for the Robokassa account you want to receive payments.'),
+        '#default_value' => variable_get('uc_robokassa_MerchantLogin', ''),
+      );
+      $form['uc_robokassa_MerchantPass1'] = array(
+        '#type' => 'password',
+        '#title' => t('Merchant password 1'),
+        '#description' => t('The Merchant password 1 for redirect user to Robokassa website.'),
+        '#default_value' => variable_get('uc_robokassa_MerchantPass1', ''),
+      );
+      $form['uc_robokassa_MerchantPass2'] = array(
+        '#type' => 'password',
+        '#title' => t('Merchant password 2'),
+        '#description' => t('The Merchant password 2 for check signature and XML request to Robokassa website.'),
+        '#default_value' => variable_get('uc_robokassa_MerchantPass2', ''),
+      );
+      $form['uc_robokassa_server'] = array(
+        '#type' => 'select',
+        '#title' => t('Robokassa server'),
+        '#description' => t('Robokassa server you can choose sandbox server for testing.'),
+        '#options' => array(
+          'http://test.robokassa.ru/Index.aspx' => ('Sandbox'),
+          'https://auth.robokassa.ru/Merchant/Index.aspx' => ('Live'),
+        ),
+        '#default_value' => variable_get('uc_robokassa_server', 'http://test.robokassa.ru/Index.aspx'),
+      );
+      return $form;
+  }
+}
+
+/**
+ * Returns the form elements for the Website form.
+ */
+function uc_robokassa_form($form, &$form_state, $order) {
+  global $user;
+
+  $data = array(
+    'MerchantLogin' => variable_get('uc_robokassa_MerchantLogin', ''),
+    'OutSum' => uc_currency_format($order->order_total, FALSE, FALSE, '.'),
+    'InvId' => $order->order_id,
+    'InvDesc' => t('Order @order_id at !store', array('@order_id' => $order->order_id, '!store' => uc_store_name())),
+    'Email' => $user->mail,
+  );
+
+  $data['SignatureValue'] = md5(
+    $data['MerchantLogin'] . ':' .
+    $data['OutSum'] . ':' .
+    $data['InvId'] . ':' .
+    variable_get('uc_robokassa_MerchantPass1', '')
+  );
+
+  $form['#action'] = variable_get('uc_robokassa_server', '');
+
+  foreach ($data as $name => $value) {
+    if (!empty($value)) {
+      $form[$name] = array('#type' => 'hidden', '#value' => $value);
+    }
+  }
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Submit Order'),
+  );
+
+  return $form;
+}

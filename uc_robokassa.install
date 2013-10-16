@@ -1,0 +1,46 @@
+<?php
+
+/**
+ * Implements hook_schema().
+ */
+function uc_robokassa_schema() {
+  $schema = array();
+
+  $schema['uc_payment_robokassa_ipn'] = array(
+    'description' => 'Logs Robokassa Payment Notifications.',
+    'fields' => array(
+      'order_id' => array(
+        'description' => 'The order ID.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'mc_gross' => array(
+        'description' => 'The payment amount from Robokassa.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'received' => array(
+        'description' => 'The IPN receipt timestamp.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'indexes' => array(
+      'order_id' => array('order_id'),
+    ),
+    'foreign keys' => array(
+      'uc_orders' => array(
+        'table' => 'uc_orders',
+        'columns' => array('order_id' => 'order_id'),
+      ),
+    ),
+  );
+
+  return $schema;
+}
